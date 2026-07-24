@@ -1,3 +1,5 @@
+# coleta de dados do ThingSpeak
+#importa os dados da plataforma em nuven
 import requests
 import pandas as pd
 

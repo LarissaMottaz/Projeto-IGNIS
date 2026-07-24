@@ -1,6 +1,7 @@
 #config.py
 #Configurações centrais do projeto IGNIS
 #limites físicos, limites ambientais, pesos da IA e metadados.
+#descreve todos os sensore para a ia
 
 
 SENSORES = {

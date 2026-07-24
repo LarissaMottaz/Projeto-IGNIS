@@ -1,3 +1,5 @@
+#limpeza dos dados coletados do ThingSpeak
+#deixa os dados em padrões para o dataframe ser usado pela ia
 import pandas as pd
 
 def limpar(df):

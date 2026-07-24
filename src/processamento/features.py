@@ -1,12 +1,11 @@
 # transformação de leituras brutas dos sensores em features para o modelo de IA (cria informações mais relevantes a partir dos dados coletados)
-# features e normalização são fundamentais em qualquer projeto de Machine Learning. 
 # Eles fazem parte do pré-processamento, que prepara os dados para que a rede neural consiga aprender corretamente.
 
 import numpy as np
 from configs.sensores import SENSORES
 from configs.ia import JANELA_CURTA
 def criar_features_ambientais(df):
-
+#B1 cria indices
 #B1 Features ambientais
  # 1) Índice de Secura smbiental
    df["indice_secura"] = (
@@ -70,6 +69,7 @@ def criar_features_ambientais(df):
 )
    return df
 
+#relação entre os sensores
 #B2 Features relacionais
 
 def criar_features_relacionais(df):
@@ -105,56 +105,37 @@ def criar_features_relacionais(df):
     )
 
     return df
-
+#verifica se os sensores então mudando (variação, intensidade, direção, aceleração )
 #B3 Dinâmica temporal
 def criar_features_dinamicas(df):
    
-   for sensor, dados in SENSORES.items():
+    for sensor, dados in SENSORES.items():
 
-    if not dados["usar_delta"]:
-        continue
+        if not dados["usar_delta"]:
+            continue
 
-    coluna = f"{sensor}_norm"
+        coluna = f"{sensor}_norm"
 
-    df[f"delta_{sensor}"] = df[coluna].diff()
+        df[f"delta_{sensor}"] = df[coluna].diff()
 
-    df[f"intensidade_{sensor}"] = (
-        df[f"delta_{sensor}"].abs()
-    )
+        df[f"intensidade_{sensor}"] = df[f"delta_{sensor}"].abs()
 
-    df[f"direcao_{sensor}"] = np.sign(
-        df[f"delta_{sensor}"]
-    )
+        df[f"direcao_{sensor}"] = np.sign(df[f"delta_{sensor}"])
 
-    df[f"aceleracao_{sensor}"] = (
-        df[f"delta_{sensor}"].diff()
-    )
-
-        # Δ (variação entre leituras)
-    df[f"delta_{sensor}"] = df[coluna].diff()
-
-        # Intensidade da mudança
-    df[f"intensidade_{sensor}"] = (
-            df[f"delta_{sensor}"].abs()
-        )
-
-        # Direção da mudança
-    df[f"direcao_{sensor}"] = np.sign(
-            df[f"delta_{sensor}"]
-        )
+        df[f"aceleracao_{sensor}"] = df[f"delta_{sensor}"].diff()
 
     # Remove NaN gerado pelo diff()
     df.fillna(0, inplace=True)
 
     return df
 
-#B4 Tendencia 
+#B4 Tendencia (Media, desvio, tendencia, direção da tendencia)
 def criar_features_tendencia(df):
     janela = JANELA_CURTA
 
     for sensor, dados in SENSORES.items():
 
-        if not dados["usar_tendencia"]:
+        if not dados.get("usar_tendencia", True):
             continue
 
         coluna = f"{sensor}_norm"
@@ -187,7 +168,10 @@ def criar_features_velocidade(df):
 
     janela = 5
 
-    for sensor in SENSORES.keys():
+    for sensor, dados in SENSORES.items():
+
+        if f"delta_{sensor}" not in df.columns:
+            continue
 
         df[f"velocidade_{sensor}"] = (
 
@@ -210,8 +194,8 @@ def criar_features_velocidade(df):
 
     return df
 
-#B6 Memória
-
+#B6 Memória (memoria curta, media, longa, persistencia)
+#lembra dos registros anteriores
 def calcular_persistencia(serie, limite, tipo_risco):
   
     contador = []
@@ -278,7 +262,7 @@ def criar_features_memoria(df):
 
     return df
 
-# estado ambiental integrado (EAI)
+# estado ambiental integrado (EAI) (calculo do estado ambiental)
 #Feature desenvolvida para representar o estado global
 #do ambiente considerando simultaneamente todos os sensores 
 #O cálculo utiliza as memórias de curto prazo dos
@@ -288,7 +272,7 @@ def criar_features_memoria(df):
 #1  -> ambiente extremamente crítico
 
 def criar_estado_sensores(df):
-     for sensor, dados in SENSORES.items():
+    for sensor, dados in SENSORES.items():
 
         if not dados["usar_eai"]:
             continue
@@ -305,7 +289,7 @@ def criar_estado_sensores(df):
             estado = 1 - estado
         df[f"estado_{sensor}"] = estado
 
-        return df
+    return df
 
 # Estado Ambiental Integrado
 
@@ -317,13 +301,13 @@ def criar_eai(df):
     for sensor, dados in SENSORES.items():
 
         if not dados["usar_eai"]:
-         continue
+            continue
 
-    peso = dados["peso"]
+        peso = dados["peso"]
 
-    soma += peso * df[f"estado_{sensor}"]
+        soma += peso * df[f"estado_{sensor}"]
 
-    soma_pesos += peso
+        soma_pesos += peso
 
     df["EAI"] = soma / soma_pesos
 
@@ -339,8 +323,9 @@ def criar_persistencia_eai(df):
             tempo += 1
         else:
             tempo = 0
-        contador.append(tempo)  
-        df["EAI_persistencia"] = contador
+        contador.append(tempo)
+
+    df["EAI_persistencia"] = contador
 
     return df
 
@@ -409,7 +394,7 @@ def criar_features_eai(df):
     return df
 
 #B7 Contexto
-
+#mistura os sensores e informações externas
 def criar_features_contexto(df):
 
     # 1. Estado Climático
@@ -491,7 +476,6 @@ def criar_features_contexto(df):
     )
     # 15. Estado Ambiental Discreto
     df["classe_contexto"] = np.select(
-
         [
             df["contexto_global"] < 0.30,
             df["contexto_global"] < 0.50,
@@ -503,9 +487,10 @@ def criar_features_contexto(df):
             "Atenção",
             "Alerta",
             "Crítico"
-        ]
+        ],
+        default="Estável"
     )
-    df.fillna(0, inplace=True)
+    df = df.fillna(0)
 
     return df
 
@@ -531,6 +516,6 @@ def executar_features(df):
 
     df = criar_features_contexto(df)
 
-    df = criar_features_eai
+    df = criar_features_eai(df)
 
     return df
